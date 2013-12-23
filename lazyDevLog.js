@@ -135,19 +135,25 @@ function getYourReports(cookie, _from, _to) {
             try {
                 parser.parseString(body, function (err, parsed) {
                     var _array = [], diff;
-                    _.each(parsed.result.plan[0].item, function(item) {
-                        _array.push(item.date[0]);
-                    });
-                    diff = _.difference(_dateInfo.tillToday, _array);
-                    if (diff.length>0) {
-                        console.log('Damn, you forgot to log on this days: ', diff);
-                        deferred.resolve(diff);
+                    // if we don't have any logs for this week
+                    if ( parsed.result.plan ) {
+                        _.each(parsed.result.plan[0].item, function(item) {
+                            _array.push(item.date[0]);
+                        });
+                        diff = _.difference(_dateInfo.tillToday, _array);
+                        if (diff.length>0) {
+                            console.log('Damn, you forgot to log on this days: ', diff);
+                            deferred.resolve(diff);
+                        } else {
+                            console.log('There is nothing to do, go and have a cup of coffee... idz masakrowac lewaków...');
+                        }
                     } else {
-                        console.log('There is nothing to do, go and have a cup of coffee... idz masakrowac lewaków...');
+                        console.log('Damn, you forgot to log on this days: ', _dateInfo.tillToday);
+                        deferred.resolve(_dateInfo.tillToday);
                     }
                 });
             } catch (ex) {
-                throw new Error('Something wrong with your username or pass!');
+                throw new Error('Something wrong with parsing response!');
             }
         } else {
             throw new Error('mega buuu!');
@@ -279,7 +285,7 @@ logIn().then(getYourReports).then(go).then(function(obj) {
             }
 
             console.log('for project:' + project.id + ', at day:'+ day + ', working repos:'  + endRepos + ', end msg:'  + _config.startOfMsg+endMsg);
-            logThis(COOKIE, day, _config.startOfMsg+endMsg, project.id, project.hours, _dateInfo.from, _dateInfo.to, desc);
+            //logThis(COOKIE, day, _config.startOfMsg+endMsg, project.id, project.hours, _dateInfo.from, _dateInfo.to, desc);
 
         });
     });
