@@ -27,10 +27,11 @@ module.exports = {
     randomMsg: 'refactoring, update test and ui-tweaks',
     user: null,
     //don't store plain text password, only on encrypted partition
-    //TODO: if null ask for pass;
+    //if null you will be asked for pass;
     pass: null,
     gitUser: null,
+    //TODO: now it always ask for check
     checkBeforSend: false,
+    //TODO: add this
     addDescription : false
-
 };

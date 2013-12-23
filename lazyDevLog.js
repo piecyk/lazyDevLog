@@ -10,15 +10,16 @@ var exec = require('child_process').exec,
     request = require('request'), 
     moment = require('moment'), 
     xml2js = require('xml2js'), 
-    q = require('q'), 
+    q = require('q'),
+    prompt = require('prompt'),
+    readline = require('readline'),
 
     parser = new xml2js.Parser(),
     _dateInfo = getDateTillToday(),
+
+    //TODO rename to config.js
     _config = require('./config.js'),
-
     COOKIE = null;
-
-//console.log(_config2);
 
 function gitlog(options) {
     if (!options.repo) throw new Error('Repo required!');
@@ -100,17 +101,40 @@ function getDateTillToday() {
     };
 }
 
-function logIn() {    
+function checkIfPassword() {
+    var deferred = q.defer();    
+    if (!_config.pass) {        
+        prompt.start();
+        prompt.get([{
+            name: 'password',
+            hidden: true,
+            conform: function (value) {
+                return true;
+            }
+        }], function (err, result) {
+            deferred.resolve(result.password);
+        });
+    } else {
+        deferred.resolve();
+    }
+    return deferred.promise;
+}
+
+function logIn(pass, user, url) {    
+
+    user = user || _config.user;
+    pass = pass || _config.pass;
+    url = url || _config.url.login;
     var deferred = q.defer();
-    request.post(_config.url.login, { 
+    request.post(url, { 
         'form' : {
-            email: _config.user,
-            password: _config.pass,
+            email: user,
+            password: pass,
             remember: 'true'
         }
     }, function (error, response, body) {
         if (!error) {
-            console.log('Good we are log in, you lazy ....');
+            console.log('Try to log in, you lazy ....');
             COOKIE = response.headers['set-cookie'][0];
             deferred.resolve(COOKIE);
         } else {
@@ -153,7 +177,7 @@ function getYourReports(cookie, _from, _to) {
                     }
                 });
             } catch (ex) {
-                throw new Error('Something wrong with parsing response!');
+                throw new Error('Something wrong with parsing response(maybe wrong pass?)!');
             }
         } else {
             throw new Error('mega buuu!');
@@ -252,19 +276,17 @@ function getFromDay(day) {
 }
 
 
-logIn().then(getYourReports).then(go).then(function(obj) {
+checkIfPassword().then(logIn).then(getYourReports).then(go).then(function(obj) {
 
     _.each(obj,function(dayList) {
         // if you have more than one project
         _.each(_config.projects, function(project) {
 
             // TODO: refactor this,,, 
-
             var tmpOneProject = _.where(dayList, {projectId: project.id}),
                 endMsg = '',
                 endRepos = '',
-                day = '',
-                desc = '';
+                day = '';
 
             _.each(tmpOneProject, function(el) {
                 day = el.day;
@@ -273,21 +295,58 @@ logIn().then(getYourReports).then(go).then(function(obj) {
                 }
                 endRepos += el.repo + ' ';
             });
-           
-            if (_config.checkBeforSend) {
-                //TODO: check this 
-            } else if(endMsg === '') {
+            
+            if(endMsg === '') {
                 // random
                 endMsg = endRepos + _config.randomMsg;
             };            
-            if(_config.addDescription) {
-                //TODO: add descripton
-            }
-
-            console.log('for project:' + project.id + ', at day:'+ day + ', working repos:'  + endRepos + ', end msg:'  + _config.startOfMsg+endMsg);
-            //logThis(COOKIE, day, _config.startOfMsg+endMsg, project.id, project.hours, _dateInfo.from, _dateInfo.to, desc);
-
+            checkTheMsg(day, _config.startOfMsg+endMsg, project.id, project.hours);
         });
     });
 
 });
+
+function checkTheMsg(day, msg, id, h) {
+    var rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    rl.write(msg);
+    rl.question("check: ", function(retMsg) {
+        // TODO: Log the answer in a database
+        console.log("This will be send: ", retMsg);
+        rl.close();
+        doYouWant().then(function(ret) {
+            if(ret) {
+                logThis(COOKIE, day, retMsg, id, h, _dateInfo.from, _dateInfo.to);
+            } else {
+                checkTheMsg(day, retMsg, id, h);
+            }
+        });
+    });
+}
+
+function doYouWant() {
+    var deferred = q.defer();    
+    prompt.start();
+    
+    var property = {
+        name: 'yesno',
+        message: 'are you sure: yes/no or (e)xit?',
+        validator: /e*|y[es]*|n[o]?/,
+        warning: 'Must respond yes or no (e(xit) ',
+        default: 'no'
+    };
+    
+    prompt.get(property, function (err, result) {        
+        if (result.yesno === 'yes') {
+            deferred.resolve(true);
+        } else if (result.yesno === 'no') {
+            deferred.resolve(false);;
+        } else if (result.yesno === 'e') {
+            console.log('Bye bye');
+            process.exit();
+        }
+    });
+    return deferred.promise;
+}

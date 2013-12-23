@@ -1,20 +1,21 @@
 {
-  "name": "lazyDevLog",
-  "description": "A simple tool for loging h in week by lazy dev",
-  "version": "0.0.1",
-  "author": "piecyk <piecyk@gmail.com>",
-  "repository": {
-    "type": "git",
-    "url": "..."
-  },
-  "dependencies": {
-   "underscore": "~1.5.2", 
-   "request": "~2.30.0", 
-   "moment": "~2.4.0", 
-   "xml2js": "~0.4.0", 
-   "q": "~0.9.7"
-  },
-  "engines": {
-    "node": ">= 0.8.x"
-  }
+    "name": "lazyDevLog",
+    "description": "A simple tool for loging h in week by lazy dev",
+    "version": "0.0.1",
+    "author": "piecyk <piecyk@gmail.com>",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/piecyk/lazyDevLog"
+    },
+    "dependencies": {
+        "underscore": "~1.5.2", 
+        "request": "~2.30.0", 
+        "moment": "~2.4.0", 
+        "xml2js": "~0.4.0", 
+        "q": "~0.9.7",
+        "prompt" : "~0.2.12"
+    },
+    "engines": {
+        "node": ">= 0.8.x"
+    }
 }
