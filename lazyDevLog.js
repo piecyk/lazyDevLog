@@ -32,7 +32,7 @@ function logIn(user, pass) {
             remember: 'true'
         }
     }, function (error, response, body) {
-        if (error && response.statusCode !== 200) throw new Error('something wrong...' + error);
+        if (error) throw new Error('something wrong...' + error);
         deferred.resolve(COOKIE = response.headers['set-cookie'][0]);
     });
     return deferred.promise;
@@ -43,7 +43,7 @@ function getDataFromUrl(url, _from, _to, cookie) {
     request.get(url + '?date_from=' + (_from || _dateInfo.from) + '&date_to=' + (_to || _dateInfo.to), {
         headers: { 'Cookie': (cookie || COOKIE) }
     }, function (error, response, body) {
-        if (error && response.statusCode !== 200) throw new Error('mega buuu!' + error);
+        if (error) throw new Error('mega buuu!' + error);
         deferred.resolve(body);
     });
     return deferred.promise;
@@ -55,7 +55,7 @@ function addThis(sendObj, cookie) {
         headers: { Cookie: (cookie || COOKIE) },
         form : sendObj
     }, function (error, response, body) {
-        if (error && response.statusCode !== 200) throw new Error('ehh wina Tuska...!');
+        if (error) throw new Error('ehh wina Tuska...!');
         console.log('just made this for you lazy ass, day: ', sendObj.data);
         deferred.resolve(200);
     });
@@ -67,7 +67,7 @@ function deleteThis(id, cookie) {
     request.get(_config.url.delete +'?id='+id, {
         headers: { Cookie: (cookie || COOKIE) }
     }, function (error, response, body) {
-        if (error && response.statusCode !== 200) throw new Error('ehh wina Tuska...!');
+        if (error) throw new Error('ehh wina Tuska...!');
         console.log('just remove this id: ', id);
         deferred.resolve(200);
     });
@@ -109,18 +109,9 @@ function parsePlan(data) {
                 var obj = {
                     id : item['$'].id,
                     date : item.date[0],
-                    client: {
-                        id: item.client[0]['$'].id,
-                        name: item.client[0]['_']
-                    },
-                    project: {
-                        id: item.project[0]['$'].id,
-                        name: item.project[0]['_']
-                    },
-                    user: {
-                        id: item.user[0]['$'].id,
-                        name: item.user[0]['_']
-                    },
+                    client: { id: item.client[0]['$'].id, name: item.client[0]['_'] },
+                    project: { id: item.project[0]['$'].id, name: item.project[0]['_'] },
+                    user: { id: item.user[0]['$'].id, name: item.user[0]['_']},
                     status: item.status[0],
                     task: item.task[0],
                     hours: item.hours[0],
@@ -148,7 +139,15 @@ function parseHours(data) {
     return deferred.promise;
 };
 
+function getGitRepos(day) {
+    if (!_config.git) return []; 
 
+    var array = [];
+    _.each(_config.git.repos, function(repo) {
+        array.push(readFromGitRepo(repo, _config.git.user, day));
+    });
+    return array;
+};
 
 
 logIn().then(function(arr) {
@@ -183,86 +182,113 @@ logIn().then(function(arr) {
             pageselect:'1'
         };
         console.log('You forgot about:', emptyDays);
-
-
-        //TODO: refactor
-
-        // a - add
-        // e - edit
-        // d - delete
-        // q - quit
-        prompterChoose('what do you want to do:',['a', 'e', 'd', 'q']).then(function(ret) {
-            if (ret === 'a') {
-                prompterChoose('select day:', emptyDays).then(function(day) {
-
-                    var build = function(sendObj) {
-                        buildSendObj(day, sendObj).then(function(obj) {
-                            prompterChoose('Send (y)es/(n)o/(r)etry:', ['y', 'n', 'r']).then(function(yn) {
-                                if (yn === 'y') {
-                                    addThis(obj);
-                                } else if (yn === 'r') {
-                                    build(obj);
-                                } else if (yn === 'n') {
-                                    console.log('Bye!');
-                                }
-                            });
-                        });
-                    };
-
-                    // TODO: loop over the git repos
-                    readFromGitRepo(_config.git.repos[0], _config.git.user, '2014-03-04').then(function(fromGit) {
-                        console.log(fromGit);
-                        build(sendObj);
-                    });
-                });
-            } else if (ret === 'e') {
-                prompterChoose('select day:', filledDays).then(function(day) {
-                    var o = _.findWhere(_obj.timesheet, {date: day});
-                    sendObj.data = day;
-                    sendObj.projekt = o.project.id;
-                    sendObj.task = o.task;
-                    sendObj.desc = o.desc;
-                    sendObj.godziny = o.hours;
-
-                    var build = function(sendObj) {
-                        buildSendObj(day, sendObj).then(function(obj) {
-                            prompterChoose('Update (y)es/(n)o/(r)etry:', ['y', 'n', 'r']).then(function(yn) {
-                                if (yn === 'y') {
-                                    // because ///
-                                    deleteThis(o.id).then(function() {
-                                        addThis(obj);
-                                    });
-                                } else if (yn === 'r') {
-                                    build(obj);
-                                } else if (yn === 'n') {
-                                    console.log('Bye!');
-                                }
-                            });
-                        });
-                    };
-                    build(sendObj);
-                });
-            } else if (ret === 'd') {
-                prompterChoose('select day:', filledDays).then(function(day) {
-                    var o = _.findWhere(_obj.timesheet, {date: day});
-                    console.log('Do you want to remove id:', o.id);
-                    prompterChoose('(y)es/(n)o:', ['y', 'n']).then(function(yn) {
-                        if (yn === 'y') {
-                            deleteThis(o.id);
-                        }
-                    });
-                });
-            } else if (ret === 'q') {
-                console.log('Bye!');
-            }
+        prompterChoose('what do you want to do:',['a', 'e', 'd', 'q']).then(function(action) {
+            menuAcion(action, _obj, sendObj, filledDays, emptyDays);
         });
-
     });
 });
 
-function buildSendObj(day, sendObj) {
+function menuAcion(action, _obj, sendObj, filledDays, emptyDays) {
+    switch (action) {
+    case "a":
+        add(emptyDays, sendObj);
+        break;
+    case "e":
+        edit(_obj, sendObj, filledDays);
+        break;
+    case "d":
+        remove(_obj, filledDays);
+        break;
+    case "q":
+        console.log("Bye:)");
+        break;
+    }
+};
+
+function remove(_obj, filledDays) {
+    prompterChoose('select day:', filledDays).then(function(day) {
+        var o = _.findWhere(_obj.timesheet, {date: day});
+        console.log('Do you want to remove id:', o.id);
+        prompterChoose('(y)es/(n)o:', ['y', 'n']).then(function(yn) {
+            switch (yn) {
+            case "y":
+                deleteThis(o.id);
+                break;
+            case "n":
+                console.log("Bye:)");
+                break;
+            }
+        });
+    });
+}
+
+function add(emptyDays, sendObj) {
+    prompterChoose('select day:', emptyDays).then(function(day) {
+        sendObj.data = day;
+        var build = function(sendObj) {
+            buildSendObj(sendObj).then(function(obj) {
+                prompterChoose('Send (y)es/(n)o/(r)etry:', ['y', 'n', 'r']).then(function(yn) {
+                    switch (yn) {
+                    case "y":
+                        addThis(obj);
+                        break;
+                    case "n":
+                        console.log("Bye:)");
+                        break;
+                    case "r":
+                        build(obj);
+                        break;                        
+                    }
+                });
+            });
+        };
+        q.all(getGitRepos(day)).then(function(result) {
+            var util = require('util');
+            console.log(util.inspect(result, false, null));
+            build(sendObj);
+        });
+    });
+};
+
+// TODO:
+function edit(_obj, sendObj, filledDays) {
+    prompterChoose('select day:', filledDays).then(function(day) {
+        var o = _.findWhere(_obj.timesheet, {date: day});
+        sendObj.data = day;
+        sendObj.projekt = o.project.id;
+        sendObj.task = o.task;
+        sendObj.desc = o.desc;
+        sendObj.godziny = o.hours;
+
+        var build = function(sendObj) {
+            buildSendObj(day, sendObj).then(function(obj) {
+                prompterChoose('Update (y)es/(n)o/(r)etry:', ['y', 'n', 'r']).then(function(yn) {
+                    switch (yn) {
+                    case "y":
+                        deleteThis(o.id).then(function() {
+                            addThis(obj);
+                        });
+                        break;
+                    case "n":
+                        console.log("Bye:)");
+                        break;
+                    case "r":
+                        build(obj);
+                        break;                        
+                    }
+                });
+            });
+        };                    
+        q.all(getGitRepos(day)).then(function(result) {
+            var util = require('util');
+            console.log(util.inspect(result, false, null));
+            build(sendObj);
+        });
+    });
+};
+
+function buildSendObj(sendObj) {
     var deferred = q.defer();
-    sendObj.data = day;
     type('Set project id', (sendObj.projekt || _config.projects[0].id), _config.projects)
         .then(function(projectId) {
             sendObj.projekt = projectId;
