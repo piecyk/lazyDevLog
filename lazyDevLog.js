@@ -14,7 +14,8 @@ var exec = require('child_process').exec,
     promptly = require('promptly'),
     readline = require('readline'),
     Table = require('cli-table'),
-
+    util = require('util'),
+    
     //TODO rename to config.js
     _config = require('./config.js'),
     _dateInfo = getDateTillToday(),
@@ -220,37 +221,60 @@ function remove(_obj, filledDays) {
             }
         });
     });
-}
+};
 
-function add(emptyDays, sendObj) {
-    prompterChoose('select day:', emptyDays).then(function(day) {
-        sendObj.data = day;
-        var build = function(sendObj) {
-            buildSendObj(sendObj).then(function(obj) {
-                prompterChoose('Send (y)es/(n)o/(r)etry:', ['y', 'n', 'r']).then(function(yn) {
-                    switch (yn) {
-                    case "y":
-                        addThis(obj);
-                        break;
-                    case "n":
-                        console.log("Bye:)");
-                        break;
-                    case "r":
-                        build(obj);
-                        break;                        
-                    }
-                });
-            });
-        };
-        q.all(getGitRepos(day)).then(function(result) {
-            var util = require('util');
-            console.log(util.inspect(result, false, null));
-            build(sendObj);
+function yesNoAdd(yn, obj) {
+    switch (yn) {
+    case "y":
+        addThis(obj);
+        break;
+    case "n":
+        console.log("Bye:)");
+        break;
+    case "r":
+        build(obj);
+        break;                        
+    }
+};
+
+function yesNoEdit(yn, obj, o) {
+    switch (yn) {
+    case "y":
+        deleteThis(o.id).then(function() {
+            addThis(obj);
+        });
+        break;
+    case "n":
+        console.log("Bye:)");
+        break;
+    case "r":
+        build(obj);
+        break;                        
+    }
+};
+
+function build(sendObj, editObj) {
+    buildSendObj(sendObj).then(function(obj) {
+        prompterChoose('Send (y)es/(n)o/(r)etry:', ['y', 'n', 'r']).then(function(yn) {
+            editObj ? yesNoEdit(yn, obj, editObj) : yesNoAdd(yn, obj);
         });
     });
 };
 
-// TODO:
+function buildFactory(day, sendObj, editObj) {
+    q.all(getGitRepos(day)).then(function(result) {
+        console.log(util.inspect(result, false, null));
+        build(sendObj, editObj);
+    });
+};
+
+function add(emptyDays, sendObj) {
+    prompterChoose('select day:', emptyDays).then(function(day) {
+        sendObj.data = day;
+        buildFactory(day, sendObj);
+    });
+};
+
 function edit(_obj, sendObj, filledDays) {
     prompterChoose('select day:', filledDays).then(function(day) {
         var o = _.findWhere(_obj.timesheet, {date: day});
@@ -259,31 +283,7 @@ function edit(_obj, sendObj, filledDays) {
         sendObj.task = o.task;
         sendObj.desc = o.desc;
         sendObj.godziny = o.hours;
-
-        var build = function(sendObj) {
-            buildSendObj(day, sendObj).then(function(obj) {
-                prompterChoose('Update (y)es/(n)o/(r)etry:', ['y', 'n', 'r']).then(function(yn) {
-                    switch (yn) {
-                    case "y":
-                        deleteThis(o.id).then(function() {
-                            addThis(obj);
-                        });
-                        break;
-                    case "n":
-                        console.log("Bye:)");
-                        break;
-                    case "r":
-                        build(obj);
-                        break;                        
-                    }
-                });
-            });
-        };                    
-        q.all(getGitRepos(day)).then(function(result) {
-            var util = require('util');
-            console.log(util.inspect(result, false, null));
-            build(sendObj);
-        });
+        buildFactory(day, sendObj, o);
     });
 };
 
@@ -356,7 +356,8 @@ function gitlog(options) {
         fields = {
             subject: '%s'
         },
-        command = 'cd ' + options.repo + ' && git log --author="' + options.author + '" --after="'+options.day+' 00:00" --before="'+options.day+' 23:59" --pretty="';
+        command = 'cd ' + options.repo + ' && git log --author="' + options.author +
+            '" --after="'+options.day+' 00:00" --before="'+options.day+' 23:59" --pretty="';
 
     options.fields.forEach(function(field) {
         if (!fields[field]) throw new Error('Unknown field: ' + field);
