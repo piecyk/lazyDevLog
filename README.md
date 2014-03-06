@@ -10,10 +10,4 @@ install:
 5. node lazyDevLog.js
 
 
-TODO:
-==========
-1. import publick holidays
-
-
-
 info: piecyk [ at ] gmail.com

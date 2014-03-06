@@ -8,30 +8,32 @@
 module.exports = {
     
     //for content of this conf contact  piecyk [ at ] gmail.com
-
     projects: [
-        {
-            id : null,
-            hours : 8,
-            repos : [ 
-                { id: null, path : null }
-            ]
-        }
+        {name: null, id: null}
     ],
+    hours : 8,
     url : {
         login: null,
-        reports : null,
-        logTo : null
+        plan : null,
+        hours: null,
+        add : null,
+        delete: null
     },
-    startOfMsg: 'I was working on : ',
-    randomMsg: 'refactoring, update test and ui-tweaks',
+    defaultTask: 'I was working on : ',
+    defaultDesc: '',
     user: null,
     //don't store plain text password, only on encrypted partition
-    //if null you will be asked for pass;
+    //TODO: if null ask for pass;
     pass: null,
-    gitUser: null,
-    //TODO: now it always ask for check
-    checkBeforSend: false,
-    //TODO: add this
-    addDescription : false
+
+    git: {
+        user: null,
+        repos : [
+            { id: null, path : null }
+        ]
+    },
+    randomTask: 'refactoring, update test and ui-tweaks'
+
+    //TDOD:
+    // add support for svn
 };
