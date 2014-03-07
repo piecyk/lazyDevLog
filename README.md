@@ -11,3 +11,7 @@ install:
 
 
 info: piecyk [ at ] gmail.com
+
+TODO:
+* add support for svn
+* add auto log 
