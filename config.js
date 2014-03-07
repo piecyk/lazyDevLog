@@ -32,6 +32,11 @@ module.exports = {
             { id: null, path : null }
         ]
     },
+    jira: {
+        user: null,
+        pass: null,
+        url: null
+    },    
     randomTask: 'refactoring, update test and ui-tweaks'
 
     //TDOD:

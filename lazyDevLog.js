@@ -22,6 +22,24 @@ var exec = require('child_process').exec,
     COOKIE = null;
 
 
+function jiraQueryIssues(day) {
+    var deferred = q.defer();
+    request.get(_config.jira.url + "search?jql=assignee=" +
+                encodeURIComponent(_config.jira.user + " and (status was 'in progress' ON '"+day+"' or status changed ON '"+day+"')"), {
+                    headers: {
+                        'Authorization': 'Basic '+new Buffer(_config.jira.user+':'+_config.jira.pass).toString('base64'),
+                        'Content-Type': 'application/json'
+                    }        
+                }, function (error, response, body) {
+                    if (error) throw new Error('ehh wina Tuska...! '+ error);
+                    try {
+                        deferred.resolve(JSON.parse(body));
+                    } catch (e) {
+                        deferred.resolve(null);
+                    };                   
+                });
+    return deferred.promise;
+};
 
 function logIn(user, pass) {
     console.log('Try to log in, you lazy ....');
@@ -185,7 +203,7 @@ logIn().then(function(arr) {
         console.log('You forgot about:', emptyDays);
         prompterChoose('what do you want to do:',['a', 'e', 'd', 'q']).then(function(action) {
             menuAcion(action, _obj, sendObj, filledDays, emptyDays);
-        });
+        });               
     });
 });
 
@@ -223,7 +241,7 @@ function remove(_obj, filledDays) {
     });
 };
 
-function yesNoAdd(yn, obj) {
+function yesNoAdd(yn, obj, addFn, deleteFn) {
     switch (yn) {
     case "y":
         addThis(obj);
@@ -263,8 +281,20 @@ function build(sendObj, editObj) {
 
 function buildFactory(day, sendObj, editObj) {
     q.all(getGitRepos(day)).then(function(result) {
+        console.log('\nGit hub log for this day: ');
         console.log(util.inspect(result, false, null));
-        build(sendObj, editObj);
+
+        jiraQueryIssues(day).then(function(data) {
+            if (data) {;
+                console.log('\nYour jira task in progress or status changed for this day:');
+                _.each(data.issues, function(i) {                
+                    console.log('Parent: '+ i.fields.parent.key + ' ' + i.fields.parent.fields.summary + ' Status: ' + i.fields.status.name);
+                    console.log(i.key + ' ' + i.fields.summary);
+                });
+                console.log(' ');
+            }
+            build(sendObj, editObj);
+        });          
     });
 };
 
