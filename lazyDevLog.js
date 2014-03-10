@@ -119,11 +119,11 @@ function parsePlan(data) {
         parser = new xml2js.Parser();
 
     parser.parseString(data, function (err, result) {
+        var ret = [];
         if (!result.result.plan) {
             console.log('You dont have any timesheets for this week');
         } else {
             console.log('Your timesheet for this week :');
-            var ret = [];
             _.each(result.result.plan[0].item, function(item, i) {
                 var obj = {
                     id : item['$'].id,
@@ -148,11 +148,12 @@ function parsePlan(data) {
 function parseHours(data) {
     var deferred = q.defer(),
         parser = new xml2js.Parser();
-
     parser.parseString(data, function (err, result) {
-        if (!result.result.hours) return;
-        var hours = result.result.hours[0]['$'];
-        console.log('Your hours for this week :', hours);
+        var hours = null;
+        if (result.result.hours) {
+            hours = result.result.hours[0]['$'];
+            console.log('Your hours for this week :', hours);
+        }        
         deferred.resolve(hours);
     });
     return deferred.promise;
@@ -183,8 +184,8 @@ logIn().then(function(arr) {
         getDataFromUrl(_config.url.plan).then(parsePlan)
     ]).spread(function (parsedHours, parsedPlan) {
         var _obj = _.extend(parsedPlan, {hours: parsedHours});
-        var filledDays = _.pluck(_obj.timesheet, 'date');
-        var emptyDays = _.difference(_dateInfo.tillToday, filledDays);
+        var filledDays = _obj.timesheet ? _.pluck(_obj.timesheet, 'date') : [];
+        var emptyDays = _obj.timesheet ? _.difference(_dateInfo.tillToday, filledDays) : _dateInfo.tillToday;        
         var sendObj = {
             data: null,
             projekt: null,
