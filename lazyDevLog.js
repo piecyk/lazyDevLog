@@ -15,7 +15,7 @@ var exec = require('child_process').exec,
     readline = require('readline'),
     Table = require('cli-table'),
     util = require('util'),
-    
+
     //TODO rename to config.js
     _config = require('./config.js'),
     _dateInfo = getDateTillToday(),
@@ -29,14 +29,14 @@ function jiraQueryIssues(day) {
                     headers: {
                         'Authorization': 'Basic '+new Buffer(_config.jira.user+':'+_config.jira.pass).toString('base64'),
                         'Content-Type': 'application/json'
-                    }        
+                    }
                 }, function (error, response, body) {
                     if (error) throw new Error('ehh wina Tuska...! '+ error);
                     try {
                         deferred.resolve(JSON.parse(body));
                     } catch (e) {
                         deferred.resolve(null);
-                    };                   
+                    };
                 });
     return deferred.promise;
 };
@@ -153,14 +153,14 @@ function parseHours(data) {
         if (result.result.hours) {
             hours = result.result.hours[0]['$'];
             console.log('Your hours for this week :', hours);
-        }        
+        }
         deferred.resolve(hours);
     });
     return deferred.promise;
 };
 
 function getGitRepos(day) {
-    if (!_config.git) return []; 
+    if (!_config.git) return [];
 
     var array = [];
     _.each(_config.git.repos, function(repo) {
@@ -185,7 +185,7 @@ logIn().then(function(arr) {
     ]).spread(function (parsedHours, parsedPlan) {
         var _obj = _.extend(parsedPlan, {hours: parsedHours});
         var filledDays = _obj.timesheet ? _.pluck(_obj.timesheet, 'date') : [];
-        var emptyDays = _obj.timesheet ? _.difference(_dateInfo.tillToday, filledDays) : _dateInfo.tillToday;        
+        var emptyDays = _obj.timesheet ? _.difference(_dateInfo.tillToday, filledDays) : _dateInfo.tillToday;
         var sendObj = {
             data: null,
             projekt: null,
@@ -204,7 +204,7 @@ logIn().then(function(arr) {
         console.log('You forgot about:', emptyDays);
         prompterChoose('what do you want to do:',['a', 'e', 'd', 'q']).then(function(action) {
             menuAcion(action, _obj, sendObj, filledDays, emptyDays);
-        });               
+        });
     });
 });
 
@@ -252,7 +252,7 @@ function yesNoAdd(yn, obj, addFn, deleteFn) {
         break;
     case "r":
         build(obj);
-        break;                        
+        break;
     }
 };
 
@@ -268,7 +268,7 @@ function yesNoEdit(yn, obj, o) {
         break;
     case "r":
         build(obj);
-        break;                        
+        break;
     }
 };
 
@@ -280,22 +280,69 @@ function build(sendObj, editObj) {
     });
 };
 
-function buildFactory(day, sendObj, editObj) {
-    q.all(getGitRepos(day)).then(function(result) {
-        console.log('\nGit hub log for this day: ');
-        console.log(util.inspect(result, false, null));
-
-        jiraQueryIssues(day).then(function(data) {
-            if (data) {;
-                console.log('\nYour jira task in progress or status changed for this day:');
-                _.each(data.issues, function(i) {                
-                    console.log('Parent: '+ i.fields.parent.key + ' ' + i.fields.parent.fields.summary + ' Status: ' + i.fields.status.name);
-                    console.log(i.key + ' ' + i.fields.summary);
+// TODO: refactor this ugly fn ;/
+function parseJira(data) {
+    var jiraIssues = [];
+    _.each(data.issues, function(i) {
+        if (!_.findWhere(jiraIssues, {id: i.fields.parent.key})) {
+            jiraIssues.push({
+                id: i.fields.parent.key,
+                summary : i.fields.parent.fields.summary,
+                array : []
+            });
+        }
+        _.each(jiraIssues, function(el) {
+            if (el.id === i.fields.parent.key) {
+                el.array.push({
+                    id: i.key,
+                    summary: i.fields.summary,
+                    status: i.fields.status.name
                 });
-                console.log(' ');
             }
-            build(sendObj, editObj);
-        });          
+        });
+    });
+    return jiraIssues;
+}
+
+function showJiraIssues(data) {
+    if (!data) return;
+    console.log('\nYour jira task in progress or status changed for this day:\n');
+    uglyPrint(parseJira(data),
+              function(issue) {
+                  console.log('-story: ' + issue.id + ' Summary: ' + issue.summary);
+              }, function(task) {
+                  console.log('---id: ' + task.id +' status: '+ task.status);
+                  console.log('---summary:  ' + task.summary);
+                  console.log(' ');
+              });
+};
+
+function showGitLogs(data) {
+    if (!data) return;
+    console.log('\nGit hub log for this day: ');
+    uglyPrint(data,
+              function(log) {
+                  console.log('-repo:' + log.repo);
+              }, function(commit) {
+                  console.log('---commit:'+commit);
+              });
+};
+
+function uglyPrint(array, callback1, callback2) {
+    _.each(array, function(el) {
+        callback1(el);
+        _.each(el.array, function(_el) {
+            callback2(_el);
+        });
+    });
+};
+
+function buildFactory(day, sendObj, editObj) {
+    q.all([
+        q.all(getGitRepos(day)).then(showGitLogs),
+        jiraQueryIssues(day).then(showJiraIssues)
+    ]).spread(function (logs, issues) {
+        build(sendObj, editObj);
     });
 };
 
@@ -372,7 +419,7 @@ function readFromGitRepo(repo, author, day) {
         };
     gitlog(options).then(function(commits) {
         deferred.resolve({
-            commits : commits,
+            array : commits,
             repo: repo.id
         });
     });
